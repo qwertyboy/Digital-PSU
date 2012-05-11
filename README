@@ -1,0 +1,13 @@
+Digital PSU
+
+This is a power supply based on the revision B EEVBlog uPSU.
+
+There are a few minor changes, mainly being the removal of a few sections. On this version, the uCurrent and the USB jack have been removed. In addition, the tactile switches have been done away with in favor of just using a pin header to connect external buttons or switches. This allows easier integration with enclosures with built-in buttons/switches. The rotary encoders are still mounted to the board, but one could easily run wires to existing ones.
+
+Key Features:
+	-atmega328 - fully compatible with the Arduino IDE - includes FTDI header
+	-2 MCP23008's for I/O expansion
+	-LT3080 as main output regulator
+	-MCP4922 digital-to-analog converter
+	-MCP3204 analog-to-digital converter
+	-MAX4080F for current sensing
