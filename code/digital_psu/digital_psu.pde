@@ -350,7 +350,7 @@ void updateDisplay()
   lcd.print("OUT: ");
   lcd.print(adcVals[1]);
   lcd.print(",");
-  lcd.print(adcVals[2]);
+  lcd.print(adcVals[2] / 200.00);
   lcd.print(",");
   lcd.print((adcVals[3] * 2) / vDiv);  //We calculate the actual voltage AFTER the voltage divider, and ADC
   lcd.print("    ");
