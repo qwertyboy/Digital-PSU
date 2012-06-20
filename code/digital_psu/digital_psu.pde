@@ -22,10 +22,7 @@ ST7036 lcd = ST7036(2, 20, 0x78);
 
 //These are on mcp_general
 #define backlight_pin 7
-byte b1 = 0;
-byte b2 = 0;
-byte b3 = 0;
-byte b4 = 0;
+byte buttons[] = {0, 0, 0, 0};  //Array to store states of onboard buttons
 
 //Rotary encoder pins
 #define ENC1A 2
@@ -410,23 +407,8 @@ void updateDisplay()
 
 void readButtons()
 {
-  for(int buttonNumber = 0; buttonNumber < 4; buttonNumber++){
-    int buttonState = mcp_general.digitalRead(buttonNumber);
-    
-    if(buttonNumber == 0){
-      b1 = buttonState;
-    }
-    
-    if(buttonNumber == 1){
-      b2 = buttonState;
-    }
-    
-    if(buttonNumber == 2){
-      b3 = buttonState;
-    }
-    
-    if(buttonNumber == 3){
-      b4 = buttonState;
-    }
+  for(byte buttonNumber = 0; buttonNumber < 4; buttonNumber++){
+    byte buttonState = mcp_general.digitalRead(buttonNumber);
+    buttons[buttonNumber] = buttonState;
   }
 }
