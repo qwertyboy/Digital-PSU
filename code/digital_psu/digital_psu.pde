@@ -6,18 +6,21 @@
 #include "MCP23008.h"
 #include <MenuBackend.h>
 
+//-------------------------------------------------------------------------------------------------------------//
+//Variable nad constant initialization, initialiazation of MCP23008 library, ST7036 librar
+
 //Start 2 instances of MCP23008 library
-MCP23008 mcp_internal;
-MCP23008 mcp_general;
+MCP23008 mcp_internal;  //This one is for controlling various peripherals
+MCP23008 mcp_general;  //This one is for general purpose use. The LCD backlight is also on here
 
 //Start instance of I2C LCD library
 ST7036 lcd = ST7036(2, 20, 0x78);
 
-//Define some global variables
+//Define some constants
 //The first four here are on mcp_internal
 #define DAC_CS 1
 #define ADC_CS 0
-#define RANGE 2
+#define RANGE 2  //Range selection for rev.B boards, not used anyway
 #define LCD_RESET 3
 
 //These are on mcp_general
@@ -30,27 +33,30 @@ byte buttons[] = {0, 0, 0, 0};  //Array to store states of onboard buttons
 #define ENC2A 3
 #define ENC2B 7
 
-//These are for voltage and current setting
-float VOLTAGE_POS = 0;
-int CURRENT_POS = 0;
+//These are the counts for the rotary encoders. They are volatile because they will be modified
+//in an interrupt and we don't want the compiler to try and optimise these
+volatile unsigned int VOLTAGE_POS = 0;
+volatile unsigned int CURRENT_POS = 0;
 
 //ADC stuff
 int adcVals[] = {0, 0, 0, 0};  //Array to store the different ADC values
+//Define some ADC constants
 #define IOUT200 0
 #define IOUT 1
 #define VOUT 2
 #define VIN 3
-float VOLTAGE_PRINT_DIVISOR = 333.889816;
+float VOLTAGE_PRINT_DIVISOR = 333.889816;  //This is to output the correct value after voltage
+                                           //divider and ADC. Only to be used for VIN
 
 //These are for SPI communication and are located directly on the AVR
 #define SPI_DATA A0
 #define SPI_CLK A3
 #define ADC_DATA A1
-#define SPI_CLK_CTRL digitalWrite(SPI_CLK, HIGH); digitalWrite(SPI_CLK, LOW);
+#define SPI_CLK_CTRL digitalWrite(SPI_CLK, HIGH); digitalWrite(SPI_CLK, LOW);  //Macro to 'clock' the clock
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
-//Menu system!
+//Menu system! This area contains stuff for setting up and using the menu
 /*
 root
   Presets      Settings
@@ -61,15 +67,17 @@ root
                    Backlight
                    Contrast
 */
-
+//Start instance fo Menu Backend library
 MenuBackend menu = MenuBackend(menuUseEvent, menuChangeEvent);
 
+//Preset voltage menu
 MenuItem mPresets = MenuItem("Presets");
   MenuItem m1v8 = MenuItem("1.8V");
   MenuItem m2v5 = MenuItem("2.5V");
   MenuItem m3v3 = MenuItem("3.3V");
   MenuItem m5v = MenuItem("5.0V");
   
+//Settings menu
 MenuItem mSettings = MenuItem("Settings");
   MenuItem mCalibration = MenuItem("Calibration");
     MenuItem mAuto = MenuItem("Auto");
@@ -80,18 +88,18 @@ MenuItem mSettings = MenuItem("Settings");
     
 void menuSetup()
 {
-  menu.getRoot().add(mPresets);
-  mPresets.add(m1v8).add(m2v5).add(m3v3).add(m5v);
-  mPresets.addRight(mSettings);
-  mSettings.add(mCalibration).add(mLCD);
-  mCalibration.addRight(mAuto).add(mManual);
-  mLCD.addRight(mBacklight).add(mContrast);
+  menu.getRoot().add(mPresets).add(mSettings);           //Add Presets and Settings to root
+  mPresets.addRight(m1v8).add(m2v5).add(m3v3).add(m5v);  //Add options under Presets
+  mSettings.add(mCalibration).add(mLCD);                 //Add options under Settings
+  mCalibration.addRight(mAuto).add(mManual);             //Add options under Calibration
+  mLCD.addRight(mBacklight).add(mContrast);              //Add options under LCD
 }
 
 void menuUseEvent(MenuUseEvent used)
 {
 }
 
+//Currently prints what happened to the serial port
 void menuChangeEvent(MenuChangeEvent changed)
 {
   Serial.print("Menu change ");
@@ -100,6 +108,7 @@ void menuChangeEvent(MenuChangeEvent changed)
   Serial.println(changed.to.getName());
 }
 
+//VERY rough way to read buttons, doesn't really work
 void menuNav()
 {
   if(buttons[0] == 0){
@@ -123,11 +132,12 @@ void menuNav()
   }
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(9600);  //Serial for debugging
+  
   //Start the library for the two MCP23008's
   mcp_internal.begin(0);
   mcp_general.begin(8);
@@ -207,7 +217,7 @@ void loop()
   menuNav();
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 //This gets called when the voltage set encoder is changed
 void voltageChange()
@@ -228,7 +238,7 @@ void voltageChange()
   delay(20);
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 //This gets called when the current set encoder is changed
 void currentChange()
@@ -248,11 +258,11 @@ void currentChange()
   }
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 //Set "channel" as 1 for voltage, 2 for current. Maximum "value" is 1023, because we are using 10 bits. Maximum is 4095 if using all 12 bits
-
-void dacSend(byte channel, long int value)
+//Bit-bang the DAC
+void dacSend(byte channel, int value)
 {
   unsigned int temp;
 
@@ -310,11 +320,11 @@ void dacSend(byte channel, long int value)
   digitalWrite(SPI_DATA, temp & 1);
   SPI_CLK_CTRL
 
-    //Done sending data, so set the CS pin high to "latch" the data
+  //Done sending data, so set the CS pin high to "latch" the data
   mcp_internal.digitalWrite(DAC_CS, HIGH);
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 //We read from the ADC over SPI using this function to bit-bang
 void adcRead(byte ADC_CHANNEL)
@@ -415,7 +425,7 @@ void adcRead(byte ADC_CHANNEL)
   mcp_internal.digitalWrite(ADC_CS, HIGH);
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 void updateDisplay()
 {
@@ -437,7 +447,7 @@ void updateDisplay()
   lcd.print("    ");
 }
 
-//---------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------//
 
 void readButtons()
 {
