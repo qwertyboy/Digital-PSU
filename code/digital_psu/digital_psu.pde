@@ -15,13 +15,13 @@ ST7036 lcd = ST7036(2, 20, 0x78);
 
 //Define some global variables
 //The first four here are on mcp_internal
-#define dac_cs 1
-#define adc_cs 0
-#define range 2
-#define lcd_reset 3
+#define DAC_CS 1
+#define ADC_CS 0
+#define RANGE 2
+#define LCD_RESET 3
 
 //These are on mcp_general
-#define backlight_pin 7
+#define BACKLIGHT_PIN 7
 byte buttons[] = {0, 0, 0, 0};  //Array to store states of onboard buttons
 
 //Rotary encoder pins
@@ -31,8 +31,8 @@ byte buttons[] = {0, 0, 0, 0};  //Array to store states of onboard buttons
 #define ENC2B 7
 
 //These are for voltage and current setting
-float vPos = 0;
-int cPos = 0;
+float VOLTAGE_POS = 0;
+int CURRENT_POS = 0;
 
 //ADC stuff
 int adcVals[] = {0, 0, 0, 0};  //Array to store the different ADC values
@@ -40,12 +40,13 @@ int adcVals[] = {0, 0, 0, 0};  //Array to store the different ADC values
 #define IOUT 1
 #define VOUT 2
 #define VIN 3
-float vDiv = 333.889816;
+float VOLTAGE_PRINT_DIVISOR = 333.889816;
 
 //These are for SPI communication and are located directly on the AVR
-#define spi_data A0
-#define spi_clk A3
-#define adc_data A1
+#define SPI_DATA A0
+#define SPI_CLK A3
+#define ADC_DATA A1
+#define SPI_CLK_CTRL digitalWrite(SPI_CLK, HIGH); digitalWrite(SPI_CLK, LOW);
 
 //---------------------------------------------------//
 
@@ -131,20 +132,20 @@ void setup()
   mcp_internal.begin(0);
   mcp_general.begin(8);
 
-  //Bring lcd_reset high to enable LCD
-  mcp_internal.pinMode(lcd_reset, OUTPUT);
-  mcp_internal.digitalWrite(lcd_reset, HIGH);
+  //Bring LCD_RESET high to enable LCD
+  mcp_internal.pinMode(LCD_RESET, OUTPUT);
+  mcp_internal.digitalWrite(LCD_RESET, HIGH);
 
   //Bring CS lines high to ignore stray data
-  mcp_internal.pinMode(dac_cs, OUTPUT);
-  mcp_internal.pinMode(adc_cs, OUTPUT);
-  mcp_internal.digitalWrite(dac_cs, HIGH);
-  mcp_internal.digitalWrite(adc_cs, HIGH);
+  mcp_internal.pinMode(DAC_CS, OUTPUT);
+  mcp_internal.pinMode(ADC_CS, OUTPUT);
+  mcp_internal.digitalWrite(DAC_CS, HIGH);
+  mcp_internal.digitalWrite(ADC_CS, HIGH);
 
   //Set SPI pins as outputs
-  pinMode(spi_data, OUTPUT);
-  pinMode(spi_clk, OUTPUT);
-  pinMode(adc_data, INPUT);
+  pinMode(SPI_DATA, OUTPUT);
+  pinMode(SPI_CLK, OUTPUT);
+  pinMode(ADC_DATA, INPUT);
 
   //Set up rotary encoder pins
   pinMode(ENC1A, INPUT);
@@ -163,8 +164,8 @@ void setup()
   mcp_general.pinMode(3, INPUT);
 
   //Set up interrupts for rotary encoders
-  attachInterrupt(0, vChange, CHANGE);
-  attachInterrupt(1, cChange, CHANGE);
+  attachInterrupt(0, voltageChange, CHANGE);
+  attachInterrupt(1, currentChange, CHANGE);
   
   menuSetup();
 
@@ -172,8 +173,8 @@ void setup()
   lcd.init();
   lcd.setContrast(10);
   //Turn on backlight. Power pin is connected to mcp_general GP7
-  mcp_general.pinMode(backlight_pin, OUTPUT);
-  mcp_general.digitalWrite(backlight_pin, HIGH);
+  mcp_general.pinMode(BACKLIGHT_PIN, OUTPUT);
+  mcp_general.digitalWrite(BACKLIGHT_PIN, HIGH);
   lcd.clear();
 
   //Start up niceness  
@@ -187,10 +188,10 @@ void setup()
 
 void loop()
 {
-  //int vVal = map(vPos, 0, 1024, 0, 2048);
+  //int vVal = map(VOLTAGE_POS, 0, 1024, 0, 2048);
   //dacSend(1, vVal);
 
-  //int cVal = map(cPos, 0, 1024, 0, 2048);
+  //int cVal = map(CURRENT_POS, 0, 1024, 0, 2048);
   //dacSend(2, cVal);
 
   //adcRead(IOUT);
@@ -209,20 +210,20 @@ void loop()
 //---------------------------------------------------//
 
 //This gets called when the voltage set encoder is changed
-void vChange()
+void voltageChange()
 {
   if(digitalRead(ENC1A) != digitalRead(ENC1B)){
-    vPos++;
+    VOLTAGE_POS++;
   }else{
-    vPos--;
+    VOLTAGE_POS--;
   }
 
-  if(vPos >= 1024){
-    vPos = 1024;
+  if(VOLTAGE_POS >= 1024){
+    VOLTAGE_POS = 1024;
   }
 
-  if(vPos <= 0){
-    vPos = 0;
+  if(VOLTAGE_POS <= 0){
+    VOLTAGE_POS = 0;
   }
   delay(20);
 }
@@ -230,20 +231,20 @@ void vChange()
 //---------------------------------------------------//
 
 //This gets called when the current set encoder is changed
-void cChange()
+void currentChange()
 {
   if(digitalRead(ENC2A) != digitalRead(ENC2B)){
-    cPos++;
+    CURRENT_POS++;
   }else{
-    cPos--;
+    CURRENT_POS--;
   }
 
-  if(cPos >= 1024){
-    cPos = 1024;
+  if(CURRENT_POS >= 1024){
+    CURRENT_POS = 1024;
   }
 
-  if(cPos <= 0){
-    cPos = 0;
+  if(CURRENT_POS <= 0){
+    CURRENT_POS = 0;
   }
 }
 
@@ -253,167 +254,165 @@ void cChange()
 
 void dacSend(byte channel, long int value)
 {
-#define dac_clk digitalWrite(spi_clk, HIGH); digitalWrite(spi_clk, LOW);
   unsigned int temp;
 
   //Bring CS low to enable communication
-  mcp_internal.digitalWrite(dac_cs, LOW);
+  mcp_internal.digitalWrite(DAC_CS, LOW);
 
   //If "channel" is set to volatge, send a LOW bit, vice-versa for current
   if(channel == 1){
-    digitalWrite(spi_data, LOW);
+    digitalWrite(SPI_DATA, LOW);
   }else{
-    digitalWrite(spi_data, HIGH);
+    digitalWrite(SPI_DATA, HIGH);
   }
 
-  dac_clk
-    digitalWrite(spi_data, LOW);  //Unbuffered VREF input
-  dac_clk
-    digitalWrite(spi_data, LOW);  //Output gain x2
-  dac_clk
-    digitalWrite(spi_data, HIGH);  //Disable shutdown
-  dac_clk
+  SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, LOW);  //Unbuffered VREF input
+  SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, LOW);  //Output gain x2
+  SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, HIGH);  //Disable shutdown
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>11) & 1));  //Only using 10 bits of 12 bit DAC. It won't work without these
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>11) & 1));  //Only using 10 bits of 12 bit DAC. It won't work without these
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>10) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>10) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>9) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>9) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>8) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>8) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>7) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>7) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>6) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>6) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>5) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>5) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>4) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>4) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>3) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>3) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>2) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>2) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, ((temp>>1) & 1));
-  dac_clk
+  digitalWrite(SPI_DATA, ((temp>>1) & 1));
+  SPI_CLK_CTRL
     temp = value;
-  digitalWrite(spi_data, temp & 1);
-  dac_clk
+  digitalWrite(SPI_DATA, temp & 1);
+  SPI_CLK_CTRL
 
     //Done sending data, so set the CS pin high to "latch" the data
-  mcp_internal.digitalWrite(dac_cs, HIGH);
+  mcp_internal.digitalWrite(DAC_CS, HIGH);
 }
 
 //---------------------------------------------------//
 
-//We read from the ADC using this function
-void adcRead(byte adc_channel)
+//We read from the ADC over SPI using this function to bit-bang
+void adcRead(byte ADC_CHANNEL)
 {
   byte i;  //Variable for storing the read bit from the ADC
 
-#define adc_clk digitalWrite(spi_clk, HIGH); digitalWrite(spi_clk, LOW);
 
-  mcp_internal.digitalWrite(adc_cs, LOW);  //Set ADC CS line low to begin comms
+  mcp_internal.digitalWrite(ADC_CS, LOW);  //Set ADC CS line low to begin comms
 
-  digitalWrite(spi_data, HIGH);  //Start bit
-  adc_clk
-  digitalWrite(spi_data, HIGH);  //Single input mode
-  adc_clk
-  digitalWrite(spi_data, LOW);  //D2 setup bit - this gets ignored when in single input mode
-  adc_clk
+  digitalWrite(SPI_DATA, HIGH);  //Start bit
+  SPI_CLK_CTRL
+  digitalWrite(SPI_DATA, HIGH);  //Single input mode
+  SPI_CLK_CTRL
+  digitalWrite(SPI_DATA, LOW);  //D2 setup bit - this gets ignored when in single input mode
+  SPI_CLK_CTRL
 
-  if(adc_channel == 0){  //Send set up for channel 0
-    digitalWrite(spi_data, LOW);
-    adc_clk
-    digitalWrite(spi_data, LOW);
-    adc_clk
+  if(ADC_CHANNEL == 0){  //Send set up for channel 0
+    digitalWrite(SPI_DATA, LOW);
+    SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, LOW);
+    SPI_CLK_CTRL
   }
 
-  if(adc_channel == 1){  //Send set up for channel 1
-    digitalWrite(spi_data, LOW);
-    adc_clk
-    digitalWrite(spi_data, HIGH);
-    adc_clk
-  }
-  
-  if(adc_channel == 2){  //Send set up for channel 2
-    digitalWrite(spi_data, HIGH);
-    adc_clk
-    digitalWrite(spi_data, LOW);
-    adc_clk
+  if(ADC_CHANNEL == 1){  //Send set up for channel 1
+    digitalWrite(SPI_DATA, LOW);
+    SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, HIGH);
+    SPI_CLK_CTRL
   }
   
-  if(adc_channel == 3){  //Send set up for channel 3
-    digitalWrite(spi_data, HIGH);
-    adc_clk
-    digitalWrite(spi_data, HIGH);
-    adc_clk
+  if(ADC_CHANNEL == 2){  //Send set up for channel 2
+    digitalWrite(SPI_DATA, HIGH);
+    SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, LOW);
+    SPI_CLK_CTRL
+  }
+  
+  if(ADC_CHANNEL == 3){  //Send set up for channel 3
+    digitalWrite(SPI_DATA, HIGH);
+    SPI_CLK_CTRL
+    digitalWrite(SPI_DATA, HIGH);
+    SPI_CLK_CTRL
   }
 
   //We are done sending setup data. Now we need to listen for data, MSB first, 12 bits
 
   //The first recieved bit is null, ignore it
-  adc_clk
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 11
-  bitWrite(adcVals[adc_channel], 11, i);  //Write the first bit received to the correct array element
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 11
+  bitWrite(adcVals[ADC_CHANNEL], 11, i);  //Write the first bit received to the correct array element
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 10
-  bitWrite(adcVals[adc_channel], 10, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 10
+  bitWrite(adcVals[ADC_CHANNEL], 10, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 9
-  bitWrite(adcVals[adc_channel], 9, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 9
+  bitWrite(adcVals[ADC_CHANNEL], 9, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 8
-  bitWrite(adcVals[adc_channel], 8, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 8
+  bitWrite(adcVals[ADC_CHANNEL], 8, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 7
-  bitWrite(adcVals[adc_channel], 7, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 7
+  bitWrite(adcVals[ADC_CHANNEL], 7, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 6
-  bitWrite(adcVals[adc_channel], 6, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 6
+  bitWrite(adcVals[ADC_CHANNEL], 6, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 5
-  bitWrite(adcVals[adc_channel], 5, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 5
+  bitWrite(adcVals[ADC_CHANNEL], 5, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 4
-  bitWrite(adcVals[adc_channel], 4, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 4
+  bitWrite(adcVals[ADC_CHANNEL], 4, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 3
-  bitWrite(adcVals[adc_channel], 3, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 3
+  bitWrite(adcVals[ADC_CHANNEL], 3, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 2
-  bitWrite(adcVals[adc_channel], 2, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 2
+  bitWrite(adcVals[ADC_CHANNEL], 2, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 1
-  bitWrite(adcVals[adc_channel], 1, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 1
+  bitWrite(adcVals[ADC_CHANNEL], 1, i);
+  SPI_CLK_CTRL
 
-    i = digitalRead(adc_data);  //bit 0
-  bitWrite(adcVals[adc_channel], 0, i);
-  adc_clk
+    i = digitalRead(ADC_DATA);  //bit 0
+  bitWrite(adcVals[ADC_CHANNEL], 0, i);
+  SPI_CLK_CTRL
 
-  mcp_internal.digitalWrite(adc_cs, HIGH);
+  mcp_internal.digitalWrite(ADC_CS, HIGH);
 }
 
 //---------------------------------------------------//
@@ -422,19 +421,19 @@ void updateDisplay()
 {
   lcd.setCursor(0, 0);
   lcd.print("SET: ");
-  lcd.print(vPos / 100.00);
+  lcd.print(VOLTAGE_POS / 100.00);
   lcd.print("V ");
   lcd.setCursor(0, 12);
-  lcd.print(cPos);
+  lcd.print(CURRENT_POS);
   lcd.print("mA  ");
 
   lcd.setCursor(1, 0);
   lcd.print("OUT: ");
-  lcd.print(adcVals[1]);
+  lcd.print(adcVals[IOUT]);
   lcd.print(",");
-  lcd.print(adcVals[2]);
+  lcd.print(adcVals[VOUT]);
   lcd.print(",");
-  lcd.print((adcVals[3] * 2) / vDiv);  //We calculate the actual voltage AFTER the voltage divider, and ADC
+  lcd.print((adcVals[VIN] * 2) / VOLTAGE_PRINT_DIVISOR);  //We calculate the actual voltage AFTER the voltage divider, and ADC
   lcd.print("    ");
 }
 
