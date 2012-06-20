@@ -1,8 +1,10 @@
+//Board should be set to "Arduino Pro or Pro Mini (3.3V, 8MHz) w/ ATmega328"
 #include <WProgram.h>
 #include <Wire.h>
 #include "ST7036.h"
 #include "LCD_C0220BiZ.h"
 #include "MCP23008.h"
+#include <MenuBackend.h>
 
 //Start 2 instances of MCP23008 library
 MCP23008 mcp_internal;
@@ -20,10 +22,10 @@ ST7036 lcd = ST7036(2, 20, 0x78);
 
 //These are on mcp_general
 #define backlight_pin 7
-int b1 = 0;
-int b2 = 0;
-int b3 = 0;
-int b4 = 0;
+byte b1 = 0;
+byte b2 = 0;
+byte b3 = 0;
+byte b4 = 0;
 
 //Rotary encoder pins
 #define ENC1A 2
@@ -48,7 +50,55 @@ float vDiv = 333.889816;
 #define spi_clk A3
 #define adc_data A1
 
+//---------------------------------------------------//
 
+//Menu system!
+/*
+root
+  Presets      Settings
+    1.8V         Calibration
+    2.5V           Auto
+    3.3V           Manual
+    5.0V         LCD
+                   Backlight
+                   Contrast
+*/
+
+MenuBackend menu = MenuBackend(menuUseEvent, menuChangeEvent);
+
+MenuItem mPresets = MenuItem("Presets");
+  MenuItem m1v8 = MenuItem("1.8V");
+  MenuItem m2v5 = MenuItem("2.5V");
+  MenuItem m3v3 = MenuItem("3.3V");
+  MenuItem m5v = MenuItem("5.0V");
+  
+MenuItem mSettings = MenuItem("Settings");
+  MenuItem mCalibration = MenuItem("Calibration");
+    MenuItem mAuto = MenuItem("Auto");
+    MenuItem mManual = MenuItem("Manual");
+  MenuItem mLCD = MenuItem("LCD");
+    MenuItem mBacklight = MenuItem("Backlight");
+    MenuItem mContrast = MenuItem("Contrast");
+    
+void menuSetup()
+{
+  menu.getRoot().add(mPresets);
+  mPresets.add(m1v8).add(m2v5).add(m3v3).add(m5v);
+  mPresets.addRight(mSettings);
+  mSettings.add(mCalibration).add(mLCD);
+  mCalibration.add(mAuto).add(mManual);
+  mLCD.add(mBacklight).add(mContrast);
+}
+
+void menuUseEvent(MenuUseEvent used)
+{
+}
+
+void menuChangeEvent(MenuChangeEvent changed)
+{
+}
+
+//---------------------------------------------------//
 
 void setup()
 {
@@ -350,7 +400,7 @@ void updateDisplay()
   lcd.print("OUT: ");
   lcd.print(adcVals[1]);
   lcd.print(",");
-  lcd.print(adcVals[2] / 200.00);
+  lcd.print(adcVals[2]);
   lcd.print(",");
   lcd.print((adcVals[3] * 2) / vDiv);  //We calculate the actual voltage AFTER the voltage divider, and ADC
   lcd.print("    ");
