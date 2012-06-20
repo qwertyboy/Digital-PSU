@@ -83,8 +83,8 @@ void menuSetup()
   mPresets.add(m1v8).add(m2v5).add(m3v3).add(m5v);
   mPresets.addRight(mSettings);
   mSettings.add(mCalibration).add(mLCD);
-  mCalibration.add(mAuto).add(mManual);
-  mLCD.add(mBacklight).add(mContrast);
+  mCalibration.addRight(mAuto).add(mManual);
+  mLCD.addRight(mBacklight).add(mContrast);
 }
 
 void menuUseEvent(MenuUseEvent used)
@@ -93,6 +93,33 @@ void menuUseEvent(MenuUseEvent used)
 
 void menuChangeEvent(MenuChangeEvent changed)
 {
+  Serial.print("Menu change ");
+  Serial.print(changed.from.getName());
+  Serial.print(" ");
+  Serial.println(changed.to.getName());
+}
+
+void menuNav()
+{
+  if(buttons[0] == 0){
+    menu.moveDown();
+    delay(10);
+  }
+  
+  if(buttons[1] == 0){
+    menu.moveUp();
+    delay(10);
+  }
+  
+  if(buttons[2] == 0){
+    menu.moveLeft();
+    delay(10);
+  }
+  
+  if(buttons[3] == 0){
+    menu.moveRight();
+    delay(10);
+  }
 }
 
 //---------------------------------------------------//
@@ -138,6 +165,8 @@ void setup()
   //Set up interrupts for rotary encoders
   attachInterrupt(0, vChange, CHANGE);
   attachInterrupt(1, cChange, CHANGE);
+  
+  menuSetup();
 
   //Initialize the LCD
   lcd.init();
@@ -158,17 +187,23 @@ void setup()
 
 void loop()
 {
-  int vVal = map(vPos, 0, 1024, 0, 2048);
-  dacSend(1, vVal);
+  //int vVal = map(vPos, 0, 1024, 0, 2048);
+  //dacSend(1, vVal);
 
-  int cVal = map(cPos, 0, 1024, 0, 2048);
-  dacSend(2, cVal);
+  //int cVal = map(cPos, 0, 1024, 0, 2048);
+  //dacSend(2, cVal);
 
-  adcRead(IOUT);
-  adcRead(VOUT);
-  adcRead(VIN);
+  //adcRead(IOUT);
+  //adcRead(VOUT);
+  //adcRead(VIN);
 
-  updateDisplay();
+  //updateDisplay();
+  readButtons();
+  //for(byte b = 0; b < 4; b++){
+  //  Serial.println(buttons[b], DEC);
+  //}
+  
+  menuNav();
 }
 
 //---------------------------------------------------//
