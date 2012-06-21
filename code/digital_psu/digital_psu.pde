@@ -6,7 +6,7 @@
 #include "MCP23008.h"
 #include <MenuBackend.h>
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 //Variable nad constant initialization, initialiazation of MCP23008 library, ST7036 librar
 
 //Start 2 instances of MCP23008 library
@@ -26,6 +26,7 @@ ST7036 lcd = ST7036(2, 20, 0x78);
 //These are on mcp_general
 #define BACKLIGHT_PIN 7
 byte buttons[] = {0, 0, 0, 0};  //Array to store states of onboard buttons
+#define MENUBUTTON 0
 
 //Rotary encoder pins
 #define ENC1A 2
@@ -54,7 +55,97 @@ float VOLTAGE_PRINT_DIVISOR = 333.889816;  //This is to output the correct value
 #define ADC_DATA A1
 #define SPI_CLK_CTRL digitalWrite(SPI_CLK, HIGH); digitalWrite(SPI_CLK, LOW);  //Macro to 'clock' the clock
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
+
+//MULTI-CLICK: One Button, Multiple Events
+
+//Timing variables
+byte DEBOUNCE = 20;
+byte DOUBLE_CLICK_GAP = 250;
+byte HOLDTIME = 2000;
+byte LONG_HOLDTIME = 5000;
+
+//Other variables
+boolean BUTTONVAL = HIGH;
+boolean BUTTONLAST = HIGH;
+boolean DOUBLE_CLICK_WAITING = false;
+boolean DOUBLE_CLICK_UP = false;
+boolean SINGLE_OK = true;
+long DOWNTIME = -1;
+long UPTIME = -1;
+boolean IGNOREUP = false;
+boolean UP_WAIT = false;
+boolean HOLD_EVENT_PAST = false;
+boolean LONG_HOLD_EVENT_PAST = false;
+
+//Call to check button
+int menuButton()
+{
+  int event = 0;
+  
+  //Read button state - first one on mcp_general
+  BUTTONVAL = mcp_general.digitalRead(MENUBUTTON);
+  
+  //Button pressed
+  if(BUTTONVAL == LOW && BUTTONLAST == HIGH && (millis() - UPTIME) > DEBOUNCE){
+    DOWNTIME = millis();
+    IGNOREUP = false;
+    UP_WAIT = false;
+    SINGLE_OK = true;
+    HOLD_EVENT_PAST = false;
+    LONG_HOLD_EVENT_PAST = false;
+    
+    if((millis() - UPTIME) < DOUBLE_CLICK_GAP && DOUBLE_CLICK_UP == false && DOUBLE_CLICK_WAITING == true) DOUBLE_CLICK_UP = true;
+    else DOUBLE_CLICK_UP = false;
+    DOUBLE_CLICK_WAITING = false;
+  }
+  
+  //Button released
+  else if(BUTTONVAL == HIGH && BUTTONLAST == LOW && (millis() - DOWNTIME) > DEBOUNCE){
+    if(!IGNOREUP){
+      UPTIME = millis();
+      if(DOUBLE_CLICK_UP == false) DOUBLE_CLICK_WAITING = true;
+      else{
+        event = 2;
+        DOUBLE_CLICK_UP = false;
+        DOUBLE_CLICK_WAITING = false;
+        SINGLE_OK = false;
+      }
+    }
+  }
+  
+  //Normal click event; double click expired
+  if(BUTTONVAL == HIGH && (millis() - UPTIME) >= DOUBLE_CLICK_GAP && DOUBLE_CLICK_WAITING == true && DOUBLE_CLICK_UP == false && SINGLE_OK == true){
+    event = 1;
+    DOUBLE_CLICK_WAITING = false;
+  }
+  
+  //Test for hold
+  if(BUTTONVAL == LOW && (millis() - DOWNTIME) >= HOLDTIME){
+    //Trigger short hold
+    if(!HOLD_EVENT_PAST){
+      event = 3;
+      UP_WAIT = true;
+      IGNORE_UP = true;
+      DOUBLE_CLICK_UP = false;
+      DOUBLE_CLICK_WAITING = false;
+      HOLD_EVENT_PAST = true;
+    }
+    
+    //Trigger long hold
+    if((millis() - DOWNTIME) >= LONG_HOLDTIME){
+      if(!LONG_HOLD_EVENT_PAST){
+        event = 4;
+        LONG_HOLD_EVENT_PAST = true;
+      }
+    }
+  }
+  BUTTONLAST = BUTTONVAL;
+  return event;
+}
+    
+     
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 //Menu system! This area contains stuff for setting up and using the menu
 /*
@@ -132,7 +223,7 @@ void menuNav()
   }
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 void setup()
 {
@@ -217,7 +308,7 @@ void loop()
   menuNav();
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 //This gets called when the voltage set encoder is changed
 void voltageChange()
@@ -238,7 +329,7 @@ void voltageChange()
   delay(20);
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 //This gets called when the current set encoder is changed
 void currentChange()
@@ -258,7 +349,7 @@ void currentChange()
   }
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 //Set "channel" as 1 for voltage, 2 for current. Maximum "value" is 1023, because we are using 10 bits. Maximum is 4095 if using all 12 bits
 //Bit-bang the DAC
@@ -324,7 +415,7 @@ void dacSend(byte channel, int value)
   mcp_internal.digitalWrite(DAC_CS, HIGH);
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 //We read from the ADC over SPI using this function to bit-bang
 void adcRead(byte ADC_CHANNEL)
@@ -425,7 +516,7 @@ void adcRead(byte ADC_CHANNEL)
   mcp_internal.digitalWrite(ADC_CS, HIGH);
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 void updateDisplay()
 {
@@ -447,7 +538,7 @@ void updateDisplay()
   lcd.print("    ");
 }
 
-//-------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------//
 
 void readButtons()
 {
