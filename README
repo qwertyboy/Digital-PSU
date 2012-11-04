@@ -1,13 +1,12 @@
 Digital PSU
 
-This is a power supply based on the revision B EEVBlog uPSU.
-
-There are a few minor changes, mainly being the removal of a few sections. On this version, the uCurrent and the USB jack have been removed. In addition, the tactile switches have been done away with in favor of just using a pin header to connect external buttons or switches. This allows easier integration with enclosures with built-in buttons/switches. The rotary encoders are still mounted to the board, but one could easily run wires to existing ones.
+This originally started life as the revision B EEVBlog power supply project, but I have made several changes to my version of the design. The first revision of ym design was pretty much a carbon copy of the EEVBlog design, but removed the USB jack and the micro current section. The board was designed with all through-hole components, except for the components that only come in SMD packages, and as a result, was larger and more expensive to produce. The new version, however, only uses through-hole versions of the DAC, ADC, op-amps, the LT3080, and a couple filter capacitors. Instead of using an atmega328 now, it uses an Xmega A4, both for speed and for I/O count. Also changed are the elimination of the push-buttons and MCP23008 I/O expanders.
 
 Key Features:
-	-atmega328 - fully compatible with the Arduino IDE - includes FTDI header
-	-2 MCP23008's for I/O expansion
+	-Xmega A4 simplifies design by eliminating need for I/O expansion
 	-LT3080 as main output regulator
 	-MCP4922 digital-to-analog converter
 	-MCP3204 analog-to-digital converter
 	-MAX4080F for current sensing
+	-Easily readible OLED display
+	-Intuitive menu system for set-up and calibration
